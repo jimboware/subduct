@@ -1,0 +1,99 @@
+{
+  "name": "subduct",
+  "version": "0.1.1",
+  "description": "Like Express on the server, like Axios on the client, WebRTC DataChannels on the wire.",
+  "keywords": [
+    "axios",
+    "datachannel",
+    "express",
+    "http-replacement",
+    "peer-to-peer",
+    "rpc",
+    "webrtc"
+  ],
+  "homepage": "https://github.com/jimboware/subduct#readme",
+  "bugs": {
+    "url": "https://github.com/jimboware/subduct/issues"
+  },
+  "license": "MIT",
+  "author": "jimboware",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/jimboware/subduct.git"
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "type": "module",
+  "sideEffects": [
+    "./dist/esm/server/webrtc.js",
+    "./dist/commonjs/server/webrtc.js"
+  ],
+  "exports": {
+    "./client": {
+      "import": {
+        "types": "./dist/esm/client/index.d.ts",
+        "default": "./dist/esm/client/index.js"
+      },
+      "require": {
+        "types": "./dist/commonjs/client/index.d.ts",
+        "default": "./dist/commonjs/client/index.js"
+      }
+    },
+    "./package.json": "./package.json",
+    "./server": {
+      "import": {
+        "types": "./dist/esm/server/index.d.ts",
+        "default": "./dist/esm/server/index.js"
+      },
+      "require": {
+        "types": "./dist/commonjs/server/index.d.ts",
+        "default": "./dist/commonjs/server/index.js"
+      }
+    }
+  },
+  "publishConfig": {
+    "access": "public",
+    "provenance": true
+  },
+  "scripts": {
+    "build": "tshy",
+    "prepack": "tshy",
+    "typecheck": "tsc --noEmit",
+    "format": "oxfmt",
+    "format:check": "oxfmt --check",
+    "lint": "oxlint",
+    "lint:pack": "publint && attw --pack . --profile node16",
+    "verify": "npm run typecheck && npm run lint && npm run format:check && npm run build && npm run lint:pack"
+  },
+  "dependencies": {
+    "node-datachannel": "^0.27.0",
+    "ws": "^8.18.0"
+  },
+  "devDependencies": {
+    "@arethetypeswrong/cli": "^0.17.0",
+    "@types/node": "^22.0.0",
+    "@types/ws": "^8.5.12",
+    "oxfmt": "0.45.0",
+    "oxlint": "^1.60.0",
+    "publint": "^0.3.0",
+    "tshy": "^3.0.0",
+    "typescript": "^5.6.0"
+  },
+  "tshy": {
+    "dialects": [
+      "esm",
+      "commonjs"
+    ],
+    "exports": {
+      "./client": "./src/client/index.ts",
+      "./package.json": "./package.json",
+      "./server": "./src/server/index.ts"
+    }
+  },
+  "engines": {
+    "node": ">=18.17"
+  }
+}

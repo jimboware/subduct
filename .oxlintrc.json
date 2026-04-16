@@ -1,0 +1,46 @@
+{
+  "$schema": "./node_modules/oxlint/configuration_schema.json",
+  "plugins": ["typescript", "unicorn", "oxc", "import", "promise", "node"],
+  "categories": {
+    "correctness": "error",
+    "suspicious": "error",
+    "perf": "error",
+    "restriction": "off",
+    "style": "off",
+    "pedantic": "off",
+    "nursery": "off"
+  },
+  "env": {
+    "es2024": true,
+    "node": true,
+    "browser": true
+  },
+  "rules": {
+    "typescript/no-explicit-any": "error",
+    "typescript/no-non-null-assertion": "off",
+    "typescript/consistent-type-imports": ["error", { "fixStyle": "inline-type-imports" }],
+    "typescript/no-import-type-side-effects": "error",
+    "typescript/ban-ts-comment": "error",
+    "typescript/prefer-as-const": "error",
+    "no-unused-vars": "off",
+    "typescript/no-unused-vars": [
+      "error",
+      { "argsIgnorePattern": "^_", "varsIgnorePattern": "^_", "caughtErrorsIgnorePattern": "^_" }
+    ],
+    "import/no-duplicates": "error",
+    "import/no-self-import": "error",
+    "import/first": "error",
+    "import/no-unassigned-import": "off",
+    "promise/param-names": "error",
+    "promise/always-return": "off",
+    "promise/no-callback-in-promise": "off",
+    "promise/no-promise-in-callback": "off",
+    "unicorn/no-null": "off",
+    "unicorn/prefer-node-protocol": "error",
+    "unicorn/prefer-add-event-listener": "off",
+    "unicorn/no-useless-undefined": "off",
+    "unicorn/filename-case": "off",
+    "no-await-in-loop": "off"
+  },
+  "ignorePatterns": ["dist", "coverage", "node_modules", "*.d.ts", ".tshy-build"]
+}

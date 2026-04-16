@@ -1,4 +1,4 @@
-export { Session, createClient } from './session.js';
+export { Session } from './session.js';
 export { request, get, post, put, patch, del as delete, head, options } from './direct.js';
 export type { ClientResponse, RequestConfig, ResponseType, SessionOptions } from './types.js';
 export type { Method, BodyEncoding } from '../shared/types.js';

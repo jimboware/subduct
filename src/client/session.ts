@@ -94,10 +94,6 @@ export class Session {
   }
 }
 
-export function createClient(opts: SessionOptions): Session {
-  return new Session(opts);
-}
-
 export async function executeRequest<T = unknown>(
   connection: Connection,
   config: RequestConfig,

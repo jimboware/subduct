@@ -38,9 +38,9 @@ await app.listen();
 ## Client - session
 
 ```ts
-import { createClient } from 'subduct/client';
+import { Session } from 'subduct/client';
 
-const client = createClient({ signal: 'wss://host:3000' });
+const client = new Session({ signal: 'wss://host:3000' });
 await client.connect();
 
 const a = await client.get('/users/1');

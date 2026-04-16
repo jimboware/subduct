@@ -106,7 +106,7 @@ export async function executeRequest<T = unknown>(
   const method = (config.method ?? 'GET') as Method;
   const resolved = resolveUrl(config.url, config.signal, config.path, baseUrl);
   const query = mergeQuery(resolved.query, config.params);
-  const { encoding, body, contentType } = await encodeBody(config.body);
+  const { encoding, headerBody, bytes, contentType } = await encodeBody(config.body);
   const headers: Record<string, string> = {};
   for (const [k, v] of Object.entries(config.headers ?? {})) headers[k.toLowerCase()] = v;
   if (contentType && !headers['content-type']) headers['content-type'] = contentType;
@@ -119,24 +119,30 @@ export async function executeRequest<T = unknown>(
     query,
     headers,
     bodyEncoding: encoding,
-    body,
+    body: headerBody,
   };
 
-  const response = await connection.request(
+  const envelope = await connection.request(
     message,
+    bytes,
     config.timeout ?? DEFAULT_REQUEST_TIMEOUT_MS,
     config.abortSignal,
   );
 
   const responseType: ResponseType = config.responseType ?? 'auto';
-  const { data, raw } = decodeBodyForClient(response.bodyEncoding, response.body, responseType);
+  const { data, raw } = decodeBodyForClient(
+    envelope.header.bodyEncoding,
+    envelope.header.body,
+    envelope.body,
+    responseType,
+  );
 
   return new SubductClientResponse<T>({
-    status: response.status,
-    statusText: response.statusText,
-    headers: response.headers,
+    status: envelope.header.status,
+    statusText: envelope.header.statusText,
+    headers: envelope.header.headers,
     data: data as T,
     raw,
-    bodyEncoding: response.bodyEncoding,
+    bodyEncoding: envelope.header.bodyEncoding,
   });
 }

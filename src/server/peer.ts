@@ -3,8 +3,9 @@ import {
   DEFAULT_BUFFERED_AMOUNT_LOW,
   DEFAULT_HANDSHAKE_TIMEOUT_MS,
   DEFAULT_HEARTBEAT_TIMEOUT_MS,
+  EMPTY_BYTES,
   FrameAssembler,
-  serializeFrames,
+  serializeFrame,
 } from '../shared/protocol.js';
 import type { Frame, RequestMessage, ResponseMessage } from '../shared/types.js';
 
@@ -15,7 +16,7 @@ export interface PeerOptions {
   remoteAddress?: string | undefined;
   handshakeTimeoutMs?: number;
   heartbeatTimeoutMs?: number;
-  onRequest: (peer: Peer, message: RequestMessage) => void;
+  onRequest: (peer: Peer, message: RequestMessage, body: Uint8Array) => void;
   onCancel?: (peer: Peer, requestId: string) => void;
   onOpen?: (peer: Peer) => void;
   onClose?: (peer: Peer) => void;
@@ -98,11 +99,11 @@ export class Peer {
     });
 
     dc.addEventListener('message', (ev: MessageEvent) => {
-      const raw = typeof ev.data === 'string' ? ev.data : asString(ev.data);
-      if (raw === null) return;
-      const frame = this.assembler.ingest(raw);
-      if (!frame) return;
-      this.handleFrame(frame);
+      const bytes = asBytes(ev.data);
+      if (!bytes) return;
+      const envelope = this.assembler.ingest(bytes);
+      if (!envelope) return;
+      this.handleFrame(envelope.header, envelope.body);
     });
 
     dc.addEventListener('close', () => this.teardown());
@@ -114,39 +115,39 @@ export class Peer {
     dc.addEventListener('bufferedamountlow', () => this.drainWaiters());
   }
 
-  private handleFrame(frame: Frame): void {
+  private handleFrame(frame: Frame, body: Uint8Array): void {
     switch (frame.kind) {
       case 'request':
-        this.opts.onRequest(this, frame);
+        this.opts.onRequest(this, frame, body);
         return;
       case 'cancel':
         this.opts.onCancel?.(this, frame.id);
         return;
       case 'ping':
         this.lastPingTs = Date.now();
-        void this.sendFrame({ kind: 'pong', ts: frame.ts }).catch(() => {});
+        void this.sendFrame({ kind: 'pong', ts: frame.ts }, EMPTY_BYTES).catch(() => {});
         return;
       default:
         return;
     }
   }
 
-  sendResponse(msg: ResponseMessage): void {
-    void this.sendFrame(msg).catch((err: unknown) => {
+  sendResponse(msg: ResponseMessage, body: Uint8Array): void {
+    void this.sendFrame(msg, body).catch((err: unknown) => {
       this.opts.onError?.(this, err);
     });
   }
 
-  private async sendFrame(frame: Frame): Promise<void> {
+  private async sendFrame(frame: Frame, body: Uint8Array): Promise<void> {
     const dc = this.dc;
     if (!dc || dc.readyState !== 'open') return;
-    const parts = serializeFrames(frame, this.chunkSize);
+    const parts = serializeFrame(frame, body, this.chunkSize);
     for (const part of parts) {
       if (dc.bufferedAmount > DEFAULT_BUFFERED_AMOUNT_HIGH) {
         await new Promise<void>((resolve) => this.bufferedWaiters.add(resolve));
       }
       if (this.closed || dc.readyState !== 'open') return;
-      dc.send(part);
+      dc.send(part.slice());
     }
   }
 
@@ -200,11 +201,11 @@ export class Peer {
   }
 }
 
-function asString(data: unknown): string | null {
-  if (data instanceof ArrayBuffer) return new TextDecoder().decode(new Uint8Array(data));
+function asBytes(data: unknown): Uint8Array | null {
+  if (data instanceof ArrayBuffer) return new Uint8Array(data);
   if (ArrayBuffer.isView(data)) {
     const view = data as ArrayBufferView;
-    return new TextDecoder().decode(new Uint8Array(view.buffer, view.byteOffset, view.byteLength));
+    return new Uint8Array(view.buffer, view.byteOffset, view.byteLength);
   }
   return null;
 }

@@ -1,6 +1,6 @@
 export type Method = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE' | 'HEAD' | 'OPTIONS';
 
-export type BodyEncoding = 'none' | 'json' | 'text' | 'base64' | 'form' | 'urlencoded';
+export type BodyEncoding = 'none' | 'json' | 'text' | 'raw' | 'form' | 'urlencoded';
 
 export interface FormFieldString {
   kind: 'string';
@@ -70,7 +70,6 @@ export interface ChunkFrame {
   cid: string;
   seq: number;
   total: number;
-  data: string;
 }
 
 export type Frame =

@@ -174,7 +174,7 @@ class App implements SubductApp {
       remoteAddress: session.remoteAddress,
       handshakeTimeoutMs,
       heartbeatTimeoutMs,
-      onRequest: (p, msg) => this.dispatchRequest(p, msg),
+      onRequest: (p, msg, body) => this.dispatchRequest(p, msg, body),
       onCancel: (_p, requestId) => this.cancelRequest(requestId),
       onOpen: () => session.close(),
       onClose: (p) => {
@@ -210,7 +210,7 @@ class App implements SubductApp {
     });
   }
 
-  private dispatchRequest(peer: Peer, msg: RequestMessage): void {
+  private dispatchRequest(peer: Peer, msg: RequestMessage, body: Uint8Array): void {
     const controller = new AbortController();
     this.requestControllers.set(msg.id, controller);
     const req = new ServerRequest({
@@ -220,14 +220,15 @@ class App implements SubductApp {
       query: msg.query ?? {},
       headers: msg.headers ?? {},
       bodyEncoding: msg.bodyEncoding,
-      body: msg.body,
+      headerBody: msg.body,
+      bodyBytes: body,
       sessionId: peer.sessionId,
       remoteAddress: peer.remoteAddress,
       signal: controller.signal,
     });
-    const res = new ServerResponse(msg.id, (response: ResponseMessage) => {
+    const res = new ServerResponse(msg.id, (response: ResponseMessage, bytes: Uint8Array) => {
       this.requestControllers.delete(msg.id);
-      peer.sendResponse(response);
+      peer.sendResponse(response, bytes);
     });
     void this.router.dispatch(req, res).catch((err: unknown) => {
       this.requestControllers.delete(msg.id);

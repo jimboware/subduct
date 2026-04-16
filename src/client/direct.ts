@@ -59,3 +59,10 @@ export function del<T = unknown>(url: string, config?: RequestConfig): Promise<C
 export function head<T = unknown>(url: string, config?: RequestConfig): Promise<ClientResponse<T>> {
   return oneShot<T>({ ...config, method: 'HEAD', url });
 }
+
+export function options<T = unknown>(
+  url: string,
+  config?: RequestConfig,
+): Promise<ClientResponse<T>> {
+  return oneShot<T>({ ...config, method: 'OPTIONS', url });
+}

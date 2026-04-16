@@ -8,7 +8,8 @@ export interface ServerRequestInit {
   query: Record<string, string | string[]>;
   headers: Headers;
   bodyEncoding: BodyEncoding;
-  body: unknown;
+  headerBody: unknown;
+  bodyBytes: Uint8Array;
   sessionId: string;
   remoteAddress?: string | undefined;
   signal: AbortSignal;
@@ -38,7 +39,7 @@ export class ServerRequest {
     this.remoteAddress = init.remoteAddress;
     this.bodyEncoding = init.bodyEncoding;
     this.signal = init.signal;
-    this.body = decodeBodyForServer(init.bodyEncoding, init.body);
+    this.body = decodeBodyForServer(init.bodyEncoding, init.headerBody, init.bodyBytes);
   }
 
   get(name: string): string | undefined {

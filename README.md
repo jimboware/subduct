@@ -15,7 +15,7 @@ Node 18.17 or newer. Browsers: anything modern with `RTCPeerConnection`.
 ```ts
 import { createApp } from 'subduct/server';
 
-const app = createApp({ signal: 'wss://0.0.0.0:3000' });
+const app = createApp({ signal: 'ws://0.0.0.0:3000' });
 
 app.use((req, _res, next) => {
   console.log(req.method, req.path);
@@ -75,19 +75,19 @@ await client.request({
 });
 ```
 
-Body: plain object / array / number / boolean → JSON; string → text; `Blob` / `ArrayBuffer` / `TypedArray` → base64; `FormData` → multipart; `URLSearchParams` → urlencoded. Response types: `auto`, `json`, `text`, `blob`, `arraybuffer`.
+Body: plain object / array / number / boolean → JSON; string → text; `Blob` / `ArrayBuffer` / `TypedArray` → raw bytes; `FormData` → multipart; `URLSearchParams` → urlencoded. Response types: `auto`, `json`, `text`, `blob`, `arraybuffer`.
 
 ## Under the hood
 
-The browser opens a WebSocket to your signal URL. The server sends a session id and ICE servers, the browser builds an `RTCPeerConnection` and a single `RTCDataChannel`, they exchange SDP and ICE over the WebSocket, the DataChannel opens, the WebSocket closes. After that every request is a JSON frame over the channel, chunked and backpressure-aware if payloads large. Aborted requests send a cancel frame so the server's `req.signal` fires.
+The browser opens a WebSocket to your signal URL. The server sends a session id and ICE servers, the browser builds an `RTCPeerConnection` and a single `RTCDataChannel`, they exchange SDP and ICE over the WebSocket, the DataChannel opens, the WebSocket closes. After that every message on the channel is a binary envelope - a length-prefixed JSON header followed by raw body bytes chunked and backpressure-aware for large payloads. Binary bodies travel as the raw bytes, no base64. Aborted requests send a cancel frame so the server's `req.signal` fires.
 
 ## Limitations
 
 - One DataChannel per connection. No streams, no server-sent-events.
 - Ephemeral `get()`/`post()` spin up a full peer connection per call.
-- Binary bodies are base64-framed over the channel; this is fine for RPC, not for bulk media.
+- `FormData` files are still base64-embedded in the header's form payload; multi-part binary is not plumbed through. Send a single `Blob` / `ArrayBuffer` if you need zero-overhead binary upload.
 - No automatic ICE restart. A broken connection surfaces as an error; opening the next request reconnects.
-- Signaling requires a WebSocket endpoint you control. Put it behind `wss://` and a real auth check (`verifyToken`, `allowedOrigins`).
+- Signaling requires a WebSocket endpoint you control. For production, terminate TLS in front of it (pass your own `http.Server` via `signal: { server }`) and set `verifyToken` and `allowedOrigins`. The default origin check is permissive.
 
 ## License
 

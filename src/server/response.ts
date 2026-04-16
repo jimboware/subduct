@@ -1,7 +1,8 @@
-import type { Headers, ResponseMessage } from '../shared/types.js';
 import { encodeResponseBody, statusText as defaultStatusText } from '../shared/codec.js';
+import { EMPTY_BYTES } from '../shared/protocol.js';
+import type { BodyEncoding, Headers, ResponseMessage } from '../shared/types.js';
 
-type SendFn = (msg: ResponseMessage) => void;
+type SendFn = (msg: ResponseMessage, body: Uint8Array) => void;
 
 export class ServerResponse {
   private _status = 200;
@@ -57,27 +58,34 @@ export class ServerResponse {
   json(data: unknown): this {
     if (this._ended) return this;
     if (!this._headers['content-type']) this._headers['content-type'] = 'application/json';
-    this.finalize({ encoding: 'json', body: data });
+    this.finalize('json', data, EMPTY_BYTES);
     return this;
   }
 
   send(data?: unknown): this {
     if (this._ended) return this;
     if (data === undefined || data === null) {
-      this.finalize({ encoding: 'none', body: null });
+      this.finalize('none', null, EMPTY_BYTES);
       return this;
     }
-    const encoded = encodeResponseBody(data);
-    if (!this._headers['content-type'] && encoded.contentType) {
-      this._headers['content-type'] = encoded.contentType;
-    }
-    this.finalize({ encoding: encoded.encoding, body: encoded.body });
+    this._ended = true;
+    void encodeResponseBody(data).then(
+      (encoded) => {
+        if (encoded.contentType && !this._headers['content-type']) {
+          this._headers['content-type'] = encoded.contentType;
+        }
+        this.emit(encoded.encoding, encoded.headerBody, encoded.bytes);
+      },
+      (err: unknown) => {
+        this.emit('json', { error: String((err as Error)?.message ?? err) }, EMPTY_BYTES);
+      },
+    );
     return this;
   }
 
   end(data?: unknown): void {
     if (data !== undefined) this.send(data);
-    else if (!this._ended) this.finalize({ encoding: 'none', body: null });
+    else if (!this._ended) this.finalize('none', null, EMPTY_BYTES);
   }
 
   sendStatus(code: number): this {
@@ -85,23 +93,22 @@ export class ServerResponse {
     return this;
   }
 
-  private finalize(payload: { encoding: ResponseMessage['bodyEncoding']; body: unknown }): void {
+  private finalize(encoding: BodyEncoding, headerBody: unknown, bytes: Uint8Array): void {
     if (this._ended) return;
     this._ended = true;
+    this.emit(encoding, headerBody, bytes);
+  }
+
+  private emit(encoding: BodyEncoding, headerBody: unknown, bytes: Uint8Array): void {
     const msg: ResponseMessage = {
       kind: 'response',
       id: this.requestId,
       status: this._status,
       statusText: this._statusText ?? defaultStatusText(this._status),
       headers: this._headers,
-      bodyEncoding: payload.encoding,
-      body: payload.body,
+      bodyEncoding: encoding,
+      body: headerBody,
     };
-    this.send_(msg);
-  }
-
-  failWith(code: number, message: string): void {
-    if (this._ended) return;
-    this.status(code).json({ error: message });
+    this.send_(msg, bytes);
   }
 }

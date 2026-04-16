@@ -6,11 +6,17 @@ import {
   DEFAULT_HEARTBEAT_INTERVAL_MS,
   DEFAULT_HEARTBEAT_TIMEOUT_MS,
   DEFAULT_ICE_SERVERS,
+  EMPTY_BYTES,
   FrameAssembler,
-  serializeFrames,
+  serializeFrame,
 } from '../shared/protocol.js';
 import type { Frame, RequestMessage, ResponseMessage, SignalingMessage } from '../shared/types.js';
 import { normalizeSignalUrl } from './url.js';
+
+export interface ResponseEnvelope {
+  header: ResponseMessage;
+  body: Uint8Array;
+}
 
 export interface ConnectionOptions {
   signal: string;
@@ -25,7 +31,7 @@ export interface ConnectionOptions {
 export type ConnectionState = 'idle' | 'connecting' | 'open' | 'closed';
 
 interface PendingRequest {
-  resolve: (msg: ResponseMessage) => void;
+  resolve: (env: ResponseEnvelope) => void;
   reject: (err: Error) => void;
   timer: ReturnType<typeof setTimeout> | null;
   abortSignal: AbortSignal | null;
@@ -181,14 +187,15 @@ export class Connection {
 
   async request(
     message: RequestMessage,
+    body: Uint8Array,
     timeoutMs: number,
     abortSignal?: AbortSignal,
-  ): Promise<ResponseMessage> {
+  ): Promise<ResponseEnvelope> {
     if (abortSignal?.aborted) throw new DOMException('aborted', 'AbortError');
     if (this.state !== 'open') await this.open();
     if (!this.dc || this.dc.readyState !== 'open') throw new Error('subduct: datachannel not open');
 
-    return new Promise<ResponseMessage>((resolve, reject) => {
+    return new Promise<ResponseEnvelope>((resolve, reject) => {
       const entry: PendingRequest = {
         resolve,
         reject,
@@ -209,14 +216,14 @@ export class Connection {
       if (abortSignal) {
         entry.abortHandler = () => {
           this.cleanupPending(message.id);
-          void this.sendFrame({ kind: 'cancel', id: message.id }).catch(() => {});
+          void this.sendFrame({ kind: 'cancel', id: message.id }, EMPTY_BYTES).catch(() => {});
           reject(new DOMException('aborted', 'AbortError'));
         };
         abortSignal.addEventListener('abort', entry.abortHandler, { once: true });
       }
 
       this.pending.set(message.id, entry);
-      void this.sendFrame(message).catch((err: unknown) => {
+      void this.sendFrame(message, body).catch((err: unknown) => {
         this.cleanupPending(message.id);
         reject(err instanceof Error ? err : new Error(String(err)));
       });
@@ -233,16 +240,16 @@ export class Connection {
     this.pending.delete(id);
   }
 
-  private async sendFrame(frame: Frame): Promise<void> {
+  private async sendFrame(frame: Frame, body: Uint8Array): Promise<void> {
     const dc = this.dc;
     if (!dc || dc.readyState !== 'open') throw new Error('subduct: datachannel not open');
-    const parts = serializeFrames(frame, this.chunkSize);
+    const parts = serializeFrame(frame, body, this.chunkSize);
     for (const part of parts) {
       if (dc.bufferedAmount > DEFAULT_BUFFERED_AMOUNT_HIGH) {
         await new Promise<void>((resolve) => this.bufferedWaiters.add(resolve));
       }
       if (dc.readyState !== 'open') throw new Error('subduct: datachannel closed mid-send');
-      dc.send(part);
+      dc.send(part.slice());
     }
   }
 
@@ -253,15 +260,16 @@ export class Connection {
   }
 
   private onMessage(data: unknown): void {
-    const text = typeof data === 'string' ? data : asString(data);
-    if (text === null) return;
-    const frame = this.assembler.ingest(text);
-    if (!frame) return;
+    const bytes = asBytes(data);
+    if (!bytes) return;
+    const envelope = this.assembler.ingest(bytes);
+    if (!envelope) return;
+    const frame = envelope.header;
     if (frame.kind === 'response') {
       const entry = this.pending.get(frame.id);
       if (!entry) return;
       this.cleanupPending(frame.id);
-      entry.resolve(frame);
+      entry.resolve({ header: frame, body: envelope.body });
     } else if (frame.kind === 'error') {
       const entry = this.pending.get(frame.id);
       if (!entry) return;
@@ -270,7 +278,7 @@ export class Connection {
     } else if (frame.kind === 'pong') {
       this.lastPongTs = Date.now();
     } else if (frame.kind === 'ping') {
-      void this.sendFrame({ kind: 'pong', ts: frame.ts }).catch(() => {});
+      void this.sendFrame({ kind: 'pong', ts: frame.ts }, EMPTY_BYTES).catch(() => {});
     }
   }
 
@@ -292,7 +300,7 @@ export class Connection {
         this.teardown();
         return;
       }
-      void this.sendFrame({ kind: 'ping', ts: now }).catch(() => {});
+      void this.sendFrame({ kind: 'ping', ts: now }, EMPTY_BYTES).catch(() => {});
     }, this.heartbeatInterval);
   }
 
@@ -335,11 +343,11 @@ export class Connection {
   }
 }
 
-function asString(data: unknown): string | null {
-  if (data instanceof ArrayBuffer) return new TextDecoder().decode(new Uint8Array(data));
+function asBytes(data: unknown): Uint8Array | null {
+  if (data instanceof ArrayBuffer) return new Uint8Array(data);
   if (ArrayBuffer.isView(data)) {
     const view = data as ArrayBufferView;
-    return new TextDecoder().decode(new Uint8Array(view.buffer, view.byteOffset, view.byteLength));
+    return new Uint8Array(view.buffer, view.byteOffset, view.byteLength);
   }
   return null;
 }

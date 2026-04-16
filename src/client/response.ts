@@ -1,4 +1,3 @@
-import { base64DecodeBytes } from '../shared/codec.js';
 import type { BodyEncoding } from '../shared/types.js';
 import type { ClientResponse, ClientResponseInit } from './types.js';
 
@@ -40,7 +39,7 @@ export class SubductClientResponse<T = unknown> implements ClientResponse<T> {
 
   async blob(): Promise<Blob> {
     const bytes = this.toBytes();
-    return new Blob([bytes.slice().buffer], {
+    return new Blob([bytes.slice()], {
       type: this.headers['content-type'] ?? 'application/octet-stream',
     });
   }
@@ -51,10 +50,7 @@ export class SubductClientResponse<T = unknown> implements ClientResponse<T> {
 
   private toBytes(): Uint8Array {
     if (this.raw instanceof Uint8Array) return this.raw;
-    if (typeof this.raw === 'string') {
-      if (this.bodyEncoding === 'base64') return base64DecodeBytes(this.raw);
-      return new TextEncoder().encode(this.raw);
-    }
+    if (typeof this.raw === 'string') return new TextEncoder().encode(this.raw);
     if (this.raw && typeof this.raw === 'object') {
       return new TextEncoder().encode(JSON.stringify(this.raw));
     }

@@ -1,6 +1,6 @@
 {
   "name": "subduct",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Like Express on the server, like Axios on the client, WebRTC DataChannels on the wire.",
   "keywords": [
     "axios",

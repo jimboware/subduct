@@ -1,0 +1,7 @@
+node_modules
+dist
+.tshy
+.tshy-build
+*.log
+*.tgz
+.DS_Store

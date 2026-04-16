@@ -11,7 +11,16 @@
     "rpc",
     "webrtc"
   ],
+  "homepage": "https://github.com/jimboware/subduct#readme",
+  "bugs": {
+    "url": "https://github.com/jimboware/subduct/issues"
+  },
   "license": "MIT",
+  "author": "jimboware",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/jimboware/subduct.git"
+  },
   "files": [
     "dist",
     "README.md",
@@ -46,8 +55,7 @@
     }
   },
   "publishConfig": {
-    "access": "public",
-    "provenance": true
+    "access": "public"
   },
   "scripts": {
     "build": "tshy",
